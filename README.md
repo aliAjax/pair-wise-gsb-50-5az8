@@ -33,6 +33,29 @@ python3 app.py --db ./data.db --port 8326
 - `POST /api/records`：创建记录，请求体为`{"reference":"...","data":{...}}`。
 - `POST /api/records/{id}/actions/{action}`：执行业务动作，请求体为`{"expected_version":1,"data":{...}}`。
 
+## 证据清单
+
+每份证据逐份登记，存放在记录的`payload.evidences`中，每项包含：
+
+- `type`：证据类型，只能取以下法定种类之一：`书证`、`物证`、`视听资料`、`电子数据`、`证人证言`、`当事人陈述`、`鉴定意见`、`勘验现场笔录`。
+- `pages`：页数，正整数。
+- `title`：可选标题。
+- 系统自动补充`seq`（顺序号）和`source`（`稽查登记` / `纳税人补录`）。
+
+同时维护派生字段`evidence_count`（证据份数）与`total_evidence_pages`（总页数）。
+
+证据登记动作`register_evidence`不改变案件状态，请求体：
+
+```json
+{"expected_version": 2, "data": {"evidences": [{"type": "书证", "pages": 12}]}}
+```
+
+登记规则：
+
+- 稽查人员（`inspector`）可在`opened`、`investigating`阶段登记；提出处理建议（`propose`）前必须至少登记一份证据。
+- 复议期间（`appealed`）由纳税人代理（`taxpayer_rep`）补录新证据，稽查人员不能再登记。
+- 案件结案（`closed`）后证据清单与金额全部锁定，任何人不能再补录或改动，接口返回`conflict`。
+
 除`/health`和`/`外，请求需提供`X-User-Id`、`X-Role`，可选`X-Org`。
 
 ## 测试

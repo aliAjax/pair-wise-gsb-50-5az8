@@ -47,10 +47,12 @@ class Service:
         actor = self._actor(actor)
         self._ensure_known_role(actor)
         action = text({"action": action}, "action")
-        if not self.rules.role_can_action(actor.role, action):
-            raise PermissionDenied("角色无权执行该操作")
         record = self.repository.get(record_id)
+        # 先校验状态合法性（结案锁定、状态机约束），再做与状态相关的角色判断，
+        # 确保结案后的任何改动都返回明确的锁定冲突，而不是权限错误。
         self.rules.require_transition(record, action)
+        if not self.rules.role_can_action(actor.role, action, record["state"]):
+            raise PermissionDenied("角色无权执行该操作")
         new_state, new_payload, summary = self.rules.apply_action(record, action, data or {})
         return self.repository.mutate(
             record_id=record_id,
