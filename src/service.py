@@ -51,7 +51,9 @@ class Service:
             raise PermissionDenied("角色无权执行该操作")
         record = self.repository.get(record_id)
         self.rules.require_transition(record, action)
-        new_state, new_payload, summary = self.rules.apply_action(record, action, data or {})
+        if not self.rules.role_can_action_in_state(actor.role, action, record["state"]):
+            raise PermissionDenied("当前阶段角色无权执行该操作")
+        new_state, new_payload, summary = self.rules.apply_action(record, action, data or {}, actor.role)
         return self.repository.mutate(
             record_id=record_id,
             expected_version=int(expected_version),
@@ -61,6 +63,11 @@ class Service:
             action=action,
             details={"summary": summary, "input": data or {}, "from": record["state"], "to": new_state},
         )
+
+    def evidence_types(self, actor: Actor) -> List[Dict[str, str]]:
+        actor = self._actor(actor)
+        self._ensure_known_role(actor)
+        return self.rules.evidence_catalog()
 
     def timeline(self, actor: Actor, record_id: int) -> List[Dict[str, Any]]:
         actor = self._actor(actor)

@@ -6,8 +6,12 @@ from app import build_service
 from src.domain import Actor, Conflict
 
 
-CREATE_DATA = {'taxpayer': 'Star Ltd', 'tax_period': '2025-Q4', 'declared_tax': 500000.0, 'assessed_tax': 760000.0, 'penalty_rate': 0.2, 'evidence_count': 4, 'days_late': 90, 'appeal_deadline_day': 60}
-FLOW = [('investigate', 'inspector', {'plan': '核对账簿'}, 'investigating'), ('propose', 'inspector', {'proposal': '补税并处罚'}, 'proposed'), ('review', 'reviewer', {'outcome': 'accepted', 'review_note': '证据充分'}, 'reviewed'), ('close', 'reviewer', {'final_decision': '维持处理'}, 'closed')]
+CREATE_DATA = {'taxpayer': 'Star Ltd', 'tax_period': '2025-Q4', 'declared_tax': 500000.0, 'assessed_tax': 760000.0, 'penalty_rate': 0.2, 'evidence_count': 2, 'days_late': 90, 'appeal_deadline_day': 60}
+EVIDENCES = {'evidences': [
+    {'type': 'documentary', 'title': '销售合同', 'pages': 12},
+    {'type': 'electronic_data', 'title': '银行流水电子件', 'pages': 5},
+]}
+FLOW = [('investigate', 'inspector', {'plan': '核对账簿'}, 'investigating'), ('add_evidence', 'inspector', EVIDENCES, 'investigating'), ('propose', 'inspector', {'proposal': '补税并处罚'}, 'proposed'), ('review', 'reviewer', {'outcome': 'accepted', 'review_note': '证据充分'}, 'reviewed'), ('close', 'reviewer', {'final_decision': '维持处理'}, 'closed')]
 
 
 class WorkflowTest(unittest.TestCase):
@@ -24,6 +28,11 @@ class WorkflowTest(unittest.TestCase):
         for action, role, data, expected_state in FLOW:
             record = self.service.act(Actor("operator", role), record["id"], record["version"], action, data)
             self.assertEqual(record["state"], expected_state)
+        evidences = record["payload"]["evidences"]
+        self.assertEqual(len(evidences), 2)
+        self.assertEqual(evidences[0]["seq"], 1)
+        self.assertEqual(evidences[0]["pages"], 12)
+        self.assertEqual(evidences[0]["stage"], "investigation")
         timeline = self.service.timeline(Actor("creator", "inspector"), record["id"])
         self.assertEqual(len(timeline), len(FLOW) + 1)
         self.assertEqual(timeline[-1]["action"], FLOW[-1][0])
